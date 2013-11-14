@@ -1,0 +1,167 @@
+// Copyright 2013 Karl Skomski - GPL v3
+#include "utils.h"
+
+#include <stdint.h>
+#include <string>
+#include <cassert>
+
+__forceinline bool FindPatternCompare(const unsigned char* address,
+                                      const unsigned char* signature,
+                                      const char* mask) {
+  while (*mask) {
+    if (*reinterpret_cast<const uint32_t*>(mask) == 'xxxx') {
+      if (*reinterpret_cast<const uint32_t*>(address) !=
+         *reinterpret_cast<const uint32_t*>(signature)) {
+        return false;
+      }
+
+      address += 4;
+      signature += 4;
+      mask += 4;
+      continue;
+    } else if (*reinterpret_cast<const uint16_t*>(mask) == 'xx') {
+      if (*reinterpret_cast<const uint16_t*>(address) !=
+         *reinterpret_cast<const uint16_t*>(signature)) {
+        return false;
+      }
+
+      address += 2;
+      signature += 2;
+      mask += 2;
+      continue;
+    } else if (*mask == 'x' && *address != *signature) {
+      return false;
+    }
+
+    ++address;
+    ++signature;
+    ++mask;
+  }
+
+  return *mask == 0;
+}
+
+const unsigned char* FindPatternInternal(const unsigned char* address,
+                                         size_t size,
+                                         const unsigned char* signature,
+                                         const char* mask) {
+  for (size_t i = 0; i < size; i++) {
+    if (IsBadReadPtr(address + i, 4)) return nullptr;
+    if (FindPatternCompare(address + i, signature, mask)) {
+      return address + i;
+    }
+  }
+
+  return nullptr;
+}
+
+const unsigned char* utils::FindPattern(const void* address,
+                                        size_t size,
+                                        const unsigned char* signature,
+                                        const char* mask) {
+  assert(address != nullptr);
+  assert(size != 0);
+  assert(signature != nullptr);
+  assert(mask != nullptr);
+
+  size_t mask_length = strlen(mask);
+
+  assert(mask_length != 0);
+  assert(mask_length < size);
+
+  return FindPatternInternal(
+    reinterpret_cast<const unsigned char*>(address),
+    size - mask_length, signature, mask);
+}
+
+size_t utils::GetModuleSize(const char* module_name) {
+  HMODULE hModule = GetModuleHandle(module_name);
+  if (hModule == NULL) return 0;
+  IMAGE_DOS_HEADER* pDOSHeader = reinterpret_cast<IMAGE_DOS_HEADER*>(hModule);
+  IMAGE_NT_HEADERS* pNTHeaders =
+    reinterpret_cast<IMAGE_NT_HEADERS*>(
+      reinterpret_cast<BYTE*>(pDOSHeader + pDOSHeader->e_lfanew));
+  return pNTHeaders->OptionalHeader.SizeOfImage;
+}
+
+const unsigned char* utils::FindPattern(const char* module_name,
+                                        const unsigned char* signature,
+                                        const char* mask) {
+  HMODULE module = GetModuleHandle(module_name);
+  if (module == NULL) return nullptr;
+  return utils::FindPattern(
+    reinterpret_cast<void*>(module),
+    GetModuleSize(module_name),
+    signature,
+    mask);
+}
+
+uint32_t utils::GetAbsoluteAddress(uint32_t relative_address) {
+  uint32_t destination =
+    (uint32_t)(
+    relative_address + 5 + *reinterpret_cast<int*>(relative_address + 1));
+  return destination;
+}
+
+HMODULE utils::GetModuleHandleSafe(const char* module_name) {
+  HMODULE hmModuleHandle = NULL;
+
+  do {
+    hmModuleHandle = GetModuleHandle(module_name);
+    Sleep(10);
+  } while (hmModuleHandle == NULL);
+
+  return hmModuleHandle;
+}
+
+void utils::Log(const char* format, ...) {
+  char buffer[MAX_PATH];
+
+  va_list args;
+  va_start(args, format);
+  vsnprintf_s(buffer, sizeof(buffer), sizeof(buffer), format, args);
+  va_end(args);
+  OutputDebugString(buffer);
+}
+
+const std::string utils::ConvertToANSI(const wchar_t *text) {
+  const size_t size = wcslen(text)+1;
+  std::string wtext(size, '#');
+  WideCharToMultiByte(CP_UTF8, 0, text, -1, &wtext[0], size, NULL, NULL);
+  return wtext;
+}
+
+int utils::ConvertANSIToUnicode(const char *ansi,
+                                wchar_t *unicode,
+                                int unicodeBufferSizeInBytes) {
+  int chars =
+    MultiByteToWideChar(
+      CP_UTF8, 0, ansi, -1, unicode,
+      unicodeBufferSizeInBytes / sizeof(wchar_t));
+  unicode[(unicodeBufferSizeInBytes / sizeof(wchar_t)) - 1] = 0;
+  return chars;
+}
+
+int utils::ConvertUnicodeToANSI(const wchar_t *unicode,
+                                char *ansi, int ansiBufferSize) {
+  int result =
+    WideCharToMultiByte(
+      CP_UTF8, 0, unicode, -1, ansi, ansiBufferSize, NULL, NULL);
+  ansi[ansiBufferSize - 1] = 0;
+  return result;
+}
+
+std::string utils::GetModulePath(HMODULE module) {
+  char path[MAX_PATH];
+  GetModuleFileName(module, path, MAX_PATH);
+  return std::string(path);
+}
+
+extern "C" IMAGE_DOS_HEADER __ImageBase;
+
+HMODULE utils::GetCurrentModule() {
+  return (HINSTANCE)&__ImageBase;
+}
+
+const int kMaxDriveSize = _MAX_DRIVE;
+const int kMaxDirSize = _MAX_DIR;
