@@ -3,6 +3,7 @@
 #include "utils\vmthooks.h"
 #include "utils\utils.h"
 #include "fb\core\WeakPtr.h"
+#include "fb\core\RefArray.h"
 #include "eastl\eastl.h"
 #include "bf4-classes.h"
 
@@ -62,7 +63,7 @@ DWORD WINAPI rec_thread(void* arguments) {
   }
   GetWeaponFiring getWeaponFiring =
     (GetWeaponFiring)utils::GetAbsoluteAddress(get_firing_address);
-  
+
   while (active_thread) {
     auto players = game_context->client_player_manager_->getPlayers();  
     for(  int i = 0; i < players->size() ; i++ ) {
@@ -91,6 +92,9 @@ DWORD WINAPI rec_thread(void* arguments) {
       continue;
     }
 
+    // unlock everything
+    *(int*)((DWORD)(local_player) + 0x970) = 0;
+
     WeaponFiring* weapon_firing = getWeaponFiring(local_player, 0);
 
     if (weapon_firing == nullptr ||
@@ -107,7 +111,24 @@ DWORD WINAPI rec_thread(void* arguments) {
     if (weapon_firing->weapon_firing_data->primary_fire->bullets_per_shell == 3) {
       weapon_firing->weapon_firing_data->primary_fire->bullets_per_shell += 1;
     }
+    
+    ClientSoldierEntity* soldier_entity = local_player->m_soldier.getData();
 
+    if (soldier_entity == nullptr ||
+        soldier_entity->physics_entity == nullptr) {
+      continue;
+    }
+
+    soldier_entity->physics_entity->physics_data->water_depth_limit = 10;
+    JumpStateData* jump_data =  (JumpStateData*)soldier_entity->physics_entity->physics_data->states.at(CharacterStateType::Jumping);
+    if (GetAsyncKeyState(0x54)) { // T
+      jump_data->jump_height = jump_data->jump_height == 50 ? 0.600 : 50;
+    }
+    OnGroundStateData* ground_data =  (OnGroundStateData*)soldier_entity->physics_entity->physics_data->states.at(CharacterStateType::OnGround);
+    if (GetAsyncKeyState(0x59)) { // Y
+      auto stand = ground_data->poses.at(CharacterPoseType::Stand);
+      stand->velocity = stand->velocity == 4 ? 6 : 4;
+    }
     Sleep(200);
   }
 
