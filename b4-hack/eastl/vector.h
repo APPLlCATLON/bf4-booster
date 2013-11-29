@@ -7,7 +7,7 @@
 namespace eastl {
   template <class T>
   class vector {
-   public:
+   protected:
      T* first_;
      T* last_;
      T* array_bound_;
@@ -19,6 +19,24 @@ namespace eastl {
     T at(int index) {
         auto element = ((DWORD)first_ + (index * 4));
         return element != 0 ? *(T*)(element) : 0;
+    }
+  };
+
+  template <class T, size_t node_count>
+  class fixed_vector : public vector<T> {
+    char buffer[node_count * sizeof(T)];
+   public:
+    fixed_vector<T, node_count>() {
+      first_ = last_ = (T*)&buffer[0];
+      array_bound_ = first_ + node_count;
+    }
+
+    void push_back(T& value) {
+      if (size() == node_count) {
+        utils::Log("vector overflow");
+      }
+      *last_ = value;
+      last_++;
     }
   };
 }
