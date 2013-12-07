@@ -24,6 +24,9 @@
     <ClCompile Include="utils\vmthooks.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="renderer.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\utils.h">
@@ -33,6 +36,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="bf4-classes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_fx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -6,9 +6,13 @@ namespace fb {
    public:
     T* at( int index ) {
       if( !m_array )
-        return NULL;
+        return nullptr;
 
-      return *( T** )( ( DWORD )m_array + ( index * 4 ) );
+      auto element = ((DWORD)m_array + (index * 4));
+      if (!element)
+        return nullptr;
+
+      return *(T**)(element);
     }
 
    private:
